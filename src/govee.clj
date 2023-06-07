@@ -14,20 +14,19 @@
 
 (def memo-post (memoize client/post))
 
-(defonce svc
-         {:now       t/now
-          :http-post client/post
-          :session   (atom nil)})
+(defonce svc {:now       t/now
+              :http-post client/post
+              :session   (atom nil)})
 
-(defn new-session
-  "Govee OAuth token"
-  ([svc] (new-session svc email password uuid))
-  ([{:as   _svc
-     :keys [now http-post]}
-    email password uuid]
-   (let [{:as   _resp
-          :keys [token
-                 tokenExpireCycle]}
+(defn get-token
+  "It gets a new OAuth token and returns it with its expiry time.
+
+  Example:
+
+  {:token \"xyz\", :expiry #time/instant\"xyz\"}"
+  ([] (get-token svc email password uuid))
+  ([{:keys [now http-post]} email password uuid]
+   (let [{:keys [token tokenExpireCycle]}
          (-> {:as          :json
               :form-params {:email    email
                             :password password
@@ -36,57 +35,67 @@
              :body
              :client)]
      {:token  token
-      :expiry (? (t/>> (now) (t/new-duration tokenExpireCycle :seconds)))})))
+      :expiry (t/>> (now) (t/new-duration tokenExpireCycle :seconds))})))
+
+(comment
+  (get-token))
 
 (defn expired?
-  ([current-token] (expired? current-token (t/now)))
-  ([current-token now]
-   (if-let [expiry (:expiry current-token)]
+  "Returns true if token is expired."
+  ([token] (expired? token (t/now)))
+  ([token now]
+   (if-let [expiry (:expiry token)]
      (t/< expiry now)
      true)))
 
-(defn active-session
-  "Govee OAuth token"
-  [svc]
+(comment
+  (-> svc :session deref expired?))
+
+(defn session
+  "Create an active session."
+  []
   (-> svc
       :session
-      (swap! (fn [current-token]
-               (if (expired? current-token)
-                 (new-session svc email password uuid)
-                 current-token)))))
+      (swap! (fn [token]
+               (if (expired? token)
+                 (get-token)
+                 token)))))
 
-(defn device-info "Get device information"
-  [raw-device]
-  (-> {:device/name        (:deviceName raw-device)
-       :device/temperature (-> raw-device
+(comment
+  (session))
+
+(defn get-info
+  "It gets device information."
+  [device]
+  (-> {:device/name        (:deviceName device)
+       :device/temperature (-> device
                                :deviceExt
                                :lastDeviceData
-                               json/parse-string
+                               (json/parse-string true)
                                (get :tem)
                                (/ 100)
+                               (double))
+       :device/humidity    (-> device
+                               :deviceExt
+                               :lastDeviceData
+                               (json/parse-string true)
+                               (get :hum)
+                               (/ 100)
                                (double))}
-      (with-meta raw-device)))
+      (with-meta device)))
 
-(defn device-list
-  "List of devices"
-  [{:as svc :keys [http-post]}]
-  (-> {:as          :json
-       :oauth-token (:token (active-session svc))}
-      (->> (http-post deviceURL))
-      :body
-      :devices
-      (->> (map device-info))))
+(defn get-devices
+  "It gets a list of devices."
+  ([] (get-devices svc))
+  ([{:keys [http-post]}]
+   (-> {:as          :json
+        :oauth-token (:token (session))}
+       (->> (http-post deviceURL))
+       :body
+       :devices
+       (->> (map get-info)))))
 
 (comment
   (set! *print-meta* true)
-  (reset! session nil)
-  (-> svc new-session)
-  (t/>> (t/now)
-        (t/new-duration 57600 :seconds))
-
-  (-> @session ? expired?)
-  (-> @session ? (expired? (-> (t/tomorrow) (t/at (t/time "12:38")) (t/offset-by 8))))
-  (-> svc active-session)
-  (-> svc (assoc :http-post memo-post) device-list ? first meta)
-
-  )
+  (get-devices)
+  (-> get-devices meta))
