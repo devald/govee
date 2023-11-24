@@ -12,8 +12,6 @@
 (defonce uuid (random-uuid))
 (defn ? [x] (doto x pp/pprint))
 
-(def memo-post (memoize client/post))
-
 (defonce svc {:now       t/now
               :http-post client/post
               :session   (atom nil)})

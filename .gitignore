@@ -1,3 +1,6 @@
-.idea
 *.iml
-*.nrepl-port
+.cpcache
+.idea
+.nrepl-port
+classes/*
+!classes/.gitkeep
