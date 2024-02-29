@@ -29,9 +29,9 @@
               :form-params {:email    email
                             :password password
                             :client   uuid}}
-             (->> (http-post loginURL))
-             :body
-             :client)]
+           (->> (http-post loginURL))
+           :body
+           :client)]
      {:token  token
       :expiry (t/>> (now) (t/new-duration tokenExpireCycle :seconds))})))
 
@@ -53,11 +53,11 @@
   "Create an active session."
   []
   (-> svc
-      :session
-      (swap! (fn [token]
-               (if (expired? token)
-                 (get-token)
-                 token)))))
+    :session
+    (swap! (fn [token]
+             (if (expired? token)
+               (get-token)
+               token)))))
 
 (comment
   (session))
@@ -67,20 +67,20 @@
   [device]
   (-> {:device/name        (:deviceName device)
        :device/temperature (-> device
-                               :deviceExt
-                               :lastDeviceData
-                               (json/parse-string true)
-                               (get :tem)
-                               (/ 100)
-                               (double))
+                             :deviceExt
+                             :lastDeviceData
+                             (json/parse-string true)
+                             (get :tem)
+                             (/ 100)
+                             (double))
        :device/humidity    (-> device
-                               :deviceExt
-                               :lastDeviceData
-                               (json/parse-string true)
-                               (get :hum)
-                               (/ 100)
-                               (double))}
-      (with-meta device)))
+                             :deviceExt
+                             :lastDeviceData
+                             (json/parse-string true)
+                             (get :hum)
+                             (/ 100)
+                             (double))}
+    (with-meta device)))
 
 (defn get-devices
   "It gets a list of devices."
@@ -88,10 +88,10 @@
   ([{:keys [http-post]}]
    (-> {:as          :json
         :oauth-token (:token (session))}
-       (->> (http-post deviceURL))
-       :body
-       :devices
-       (->> (map get-info)))))
+     (->> (http-post deviceURL))
+     :body
+     :devices
+     (->> (map get-info)))))
 
 (comment
   (set! *print-meta* true)
